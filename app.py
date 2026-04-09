@@ -11,9 +11,8 @@ EduCompanion AI - 苏格拉底式智能助教
 """
 
 import os
-import json
-import requests
 import streamlit as st
+from anthropic import Anthropic
 from dotenv import load_dotenv
 
 # 加载环境变量
@@ -22,8 +21,9 @@ load_dotenv()
 # ==========================================
 # API 配置
 # ==========================================
-ZHIPU_API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-ZHIPU_MODEL = "glm-4"  # 或使用 "glm-4-flash" 以获得更快的响应
+# 智谱AI海外版 Anthropic 兼容端点
+ZHIPU_BASE_URL = os.getenv("ZHIPU_BASE_URL", "https://api.z.ai/api/anthropic")
+ZHIPU_MODEL = os.getenv("ZHIPU_MODEL", "claude-3-sonnet-20240229")
 
 # ==========================================
 # 页面配置
@@ -224,9 +224,9 @@ def build_system_prompt(subject: str) -> str:
 # ==========================================
 # API 调用（流式）
 # ==========================================
-def stream_glm_response(messages: list, api_key: str, system_prompt: str):
+def stream_claude_response(messages: list, api_key: str, system_prompt: str):
     """
-    调用智谱AI GLM API 并返回流式响应
+    调用智谱AI Anthropic 兼容 API 并返回流式响应
 
     Args:
         messages: 对话历史消息列表
@@ -246,75 +246,35 @@ def stream_glm_response(messages: list, api_key: str, system_prompt: str):
         if not api_key:
             raise ValueError("API Key 不能为空")
 
-        # 构建请求头
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-
-        # 构建请求体
-        # 将系统提示词作为第一条消息
-        request_messages = [{"role": "system", "content": system_prompt}] + messages
-
-        payload = {
-            "model": ZHIPU_MODEL,
-            "messages": request_messages,
-            "stream": True,
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "max_tokens": 1024
-        }
-
-        # 发送 POST 请求
-        response = requests.post(
-            ZHIPU_API_URL,
-            headers=headers,
-            json=payload,
-            stream=True,
-            timeout=60
+        # 初始化 Anthropic 客户端，使用智谱AI海外版端点
+        client = Anthropic(
+            api_key=api_key,
+            base_url=ZHIPU_BASE_URL
         )
 
-        # 检查响应状态
-        if response.status_code == 401:
-            raise ValueError("API Key 验证失败，请检查您的密钥是否正确")
-        elif response.status_code == 403:
-            raise ValueError("API Key 无权限访问此模型")
-        elif response.status_code == 429:
-            raise ValueError("API 调用频率超限，请稍后再试")
-        elif response.status_code >= 500:
-            raise ConnectionError(f"智谱AI 服务端错误 ({response.status_code})")
-        elif response.status_code != 200:
-            raise Exception(f"API 调用失败 (状态码: {response.status_code}): {response.text}")
+        # 调用 API 并流式返回响应
+        with client.messages.stream(
+            model=ZHIPU_MODEL,
+            max_tokens=1024,
+            system=system_prompt,
+            messages=messages,
+            temperature=0.7
+        ) as stream:
+            for text in stream.text_stream:
+                yield text
 
-        # 处理流式响应
-        for line in response.iter_lines():
-            if line:
-                line = line.decode('utf-8')
-                if line.startswith('data: '):
-                    data_str = line[6:]  # 移除 "data: " 前缀
-                    if data_str.strip() == '[DONE]':
-                        break
-                    try:
-                        data = json.loads(data_str)
-                        if 'choices' in data and len(data['choices']) > 0:
-                            delta = data['choices'][0].get('delta', {})
-                            content = delta.get('content', '')
-                            if content:
-                                yield content
-                    except json.JSONDecodeError:
-                        continue
-
-    except requests.exceptions.Timeout:
-        raise ConnectionError("请求超时，请检查您的网络连接")
-    except requests.exceptions.ConnectionError:
-        raise ConnectionError("网络连接失败，请检查您的网络设置")
     except ValueError as e:
         raise ValueError(f"配置错误: {str(e)}")
     except Exception as e:
         error_msg = str(e)
-        if "API Key" in error_msg or "认证" in error_msg or "权限" in error_msg:
-            raise ValueError(f"API 验证错误: {error_msg}")
-        raise Exception(f"API 调用失败: {error_msg}")
+        if "authentication" in error_msg.lower() or "unauthorized" in error_msg.lower() or "invalid api key" in error_msg.lower():
+            raise ValueError("API Key 验证失败，请检查您的密钥是否正确")
+        elif "network" in error_msg.lower() or "connection" in error_msg.lower():
+            raise ConnectionError("网络连接失败，请检查您的网络设置")
+        elif "model" in error_msg.lower() and "not found" in error_msg.lower():
+            raise ValueError("模型不存在，请检查模型配置")
+        else:
+            raise Exception(f"API 调用失败: {error_msg}")
 
 # ==========================================
 # 主界面渲染
@@ -366,7 +326,7 @@ def render_main_interface():
                 system_prompt = build_system_prompt(st.session_state.subject)
 
                 # 调用 API 获取流式响应
-                response_generator = stream_glm_response(
+                response_generator = stream_claude_response(
                     messages=st.session_state.messages,
                     api_key=st.session_state.api_key,
                     system_prompt=system_prompt

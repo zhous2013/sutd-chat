@@ -4,8 +4,8 @@
 # Streamlit Web 应用框架
 streamlit>=1.28.0
 
+# Anthropic API 客户端
+anthropic>=0.18.0
+
 # 环境变量管理
 python-dotenv>=1.0.0
-
-# HTTP 请求处理
-requests>=2.31.0
