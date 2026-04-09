@@ -1,0 +1,11 @@
+# EduCompanion AI 依赖包
+# ==========================================
+
+# Streamlit Web 应用框架
+streamlit>=1.28.0
+
+# 环境变量管理
+python-dotenv>=1.0.0
+
+# HTTP 请求处理
+requests>=2.31.0
