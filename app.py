@@ -65,24 +65,42 @@ def render_sidebar():
     # API Key 配置
     st.sidebar.markdown("### 🔑 API 配置")
 
-    # 优先使用环境变量中的 API Key
+    # 检查是否有配置的 API Key（来自 secrets）
     env_api_key = os.getenv("ZHIPU_API_KEY", "")
+    has_configured_key = bool(env_api_key)
 
-    api_key_input = st.sidebar.text_input(
-        "智谱AI API Key",
-        type="password",
-        placeholder="请输入您的智谱AI API Key",
-        value=env_api_key,
-        help="输入您的智谱AI API Key，或设置环境变量 ZHIPU_API_KEY"
+    # API Key 来源选择
+    api_key_source = st.sidebar.radio(
+        "API Key 来源",
+        options=["使用配置的 API Key", "手动输入 API Key"],
+        index=0 if has_configured_key else 1,
+        help="默认使用部署配置的 API Key，也可以手动输入自己的密钥"
     )
 
-    st.session_state.api_key = api_key_input
-
-    # 显示 API Key 状态
-    if api_key_input:
-        st.sidebar.success("✅ API Key 已配置")
+    # 根据选择获取 API Key
+    if api_key_source == "使用配置的 API Key":
+        if has_configured_key:
+            st.session_state.api_key = env_api_key
+            st.sidebar.success("✅ 使用配置的 API Key")
+        else:
+            st.sidebar.error("❌ 未配置 API Key，请切换到手动输入")
+            st.session_state.api_key = ""
     else:
-        st.sidebar.warning("⚠️ 请输入 API Key")
+        # 手动输入 API Key
+        custom_api_key = st.sidebar.text_input(
+            "智谱AI API Key",
+            type="password",
+            placeholder="请输入您的智谱AI API Key",
+            value=st.session_state.api_key if st.session_state.api_key else "",
+            help="手动输入的 API Key 仅在当前会话有效"
+        )
+        st.session_state.api_key = custom_api_key
+
+        # 显示状态
+        if custom_api_key:
+            st.sidebar.success("✅ 手动 API Key 已配置")
+        else:
+            st.sidebar.warning("⚠️ 请输入 API Key")
 
     st.sidebar.divider()
 
