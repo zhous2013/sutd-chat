@@ -40,15 +40,10 @@ st.set_page_config(
 # ==========================================
 st.markdown("""
 <style>
-/* 隐藏密码输入框的显示/隐藏按钮 */
-[data-testid="stTextInput"] input[type="password"]::-ms-reveal,
-[data-testid="stTextInput"] input[type="password"]::-webkit-credentials-auto-fill-button {
-    display: none !important;
-}
-
-/* 针对不同浏览器的密码显示图标 */
-[data-testid="stTextInput"] .st-cf {
-    display: none !important;
+/* 隐藏 Streamlit 密码输入框的显示/切换按钮 */
+div[data-testid="stTextInput"] button[aria-label="Show password"],
+div[data-testid="stTextInput"] button[aria-label="Hide password"] {
+    visibility: hidden;
 }
 </style>
 """, unsafe_allow_html=True)
