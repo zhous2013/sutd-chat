@@ -36,6 +36,24 @@ st.set_page_config(
 )
 
 # ==========================================
+# 自定义样式（隐藏密码显示按钮）
+# ==========================================
+st.markdown("""
+<style>
+/* 隐藏密码输入框的显示/隐藏按钮 */
+[data-testid="stTextInput"] input[type="password"]::-ms-reveal,
+[data-testid="stTextInput"] input[type="password"]::-webkit-credentials-auto-fill-button {
+    display: none !important;
+}
+
+/* 针对不同浏览器的密码显示图标 */
+[data-testid="stTextInput"] .st-cf {
+    display: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================
 # 会话状态初始化
 # ==========================================
 def init_session_state():
